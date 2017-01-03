@@ -1,0 +1,463 @@
+###############################################################################
+# INTRO
+###############################################################################
+#
+# This file describes the operations used to generate Redis interfaces and implementations.
+# This is the authoritative source for the operations that are generated. (The accompanying
+# "commands.json" and "command-flags.json" only provide supplemental information.) This file uses
+# a custom grammar (see "HyperRedis.g4") for succinctly describing Redis operations and how they
+# map to the Java language. This enables us to generate a nice API that is idiomatic Java and
+# thus comfortable for Java developers.
+#
+#
+###############################################################################
+# CODE GEN OVERVIEW
+###############################################################################
+#
+# Each block in the file represents a set of interfaces that gets generated. Each block is a subset
+# of the Redis commands corpus. The main commands, and most useful for applications, are in the
+# first defined block, named simply "Redis". The interfaces generated for this first block will
+# also include accessors to get to the other blocks, which logically group the various other Redis
+# commands.
+#
+# Each block results in multiple interfaces:
+# 1. One interface for each of three styles of use: blocking, async with callbacks, and async with
+#    futures.
+# 2. Each block results in an interface and implementation *per version* of Redis. This allows the
+#    API to limit the available methods based on the version of Redis being used. The "root" of this
+#    interface hierarchy is for version 1.0.0. Each version extends the one before it so that the
+#    "bottom type" interfaces (which include no version suffix) include all available operations.
+# 3. The main "Redis" block also gets additional interfaces that further divide the operations into
+#    a few categories:
+#     a) Read-only operations that consume keys ("ReadOnlyKeys" prefix on the generated class
+#        names). These are operations marked "readonly" in "command-flags.json" and also consume
+#        keys (e.g. one or more arguments is of type "K"). This subset is used to generate an
+#        additional interface for watching values (optimistic concurrency when using transactions).
+#     b) Read-only operations ("ReadOnly" prefix on the generated class names). This is a superset
+#        of the above and includes operations that are marked "readonly" but that do not consume
+#        keys. This is useful when talking to a Redis slave in a read-only mode.
+#     c) Write operations. This set strictly does not intersect with either of the above sets. It
+#        includes all operations marked "write" in "command-flags.json". This set is used in code
+#        generated for transactions.
+#     d) All operations (generated class names have no prefix). These interfaces expose all
+#        operations, including all of the above sets and then some (e.g. also include operations
+#        which have neither "readonly" nor "write" in the "command-flags.json" file).
+#
+#
+###############################################################################
+# SYNTAX OF THIS FILE
+###############################################################################
+#
+# Each block contains a list of commands (separated by semi-colon). Comments lines that start with
+# "//" and precede a block are generated into Javadoc for the interfaces generated from that block.
+# Similarly, comment lines starting with "//" that precede a command are generated into Javadoc for
+# the methods generated from that command.
+#
+# Each command has a name, used to name the Java method. It may also have an alternate name which
+# is how the command name must be serialized when written as a request to a Redis server. For
+# example, a command named like "bit=bitop" is named "BITOP" when sending the command to Redis but
+# the Java methods are named just "bit".
+#
+# Each command may also have additional symbol tokens (they start with a colon). These tokens are
+# included in the both the generated method names but are also required in the request that is sent
+# to the server. A command that starts like "debug :object", for example, will result in a method
+# named "debugObject" and in "DEBUG OBJECT" being sent on the wire when sending the command to the
+# server. Symbols can be interleaved with other arguments, which is how they are written on the wire
+# when the request is sent. But they are de-interleaved when generating method names. For example, a
+# command like "replace K[] :with V[]" would result in the token "WITH" being serialized between the
+# key and value tokens, but the Java method would look like "replaceWith(K[] keys, V[] values)".
+#
+# Commands can have any number of arguments (space separated) followed by an optional return type
+# indicated by the "->" arrow and a Java type. Each argument is one of the following:
+#  1. A symbol, as described above: additional word(s) written to the server and included in the
+#     method name. Like the command names, they can be in the form ":name1=name2" where "name1"
+#     is used to name the method in generated Java code but "name2" is used when constructing the
+#     request sent to the server.
+#  2. A normal argument that is the Java type of a method corresponding method parameter (where
+#     the parameter name gets a default derived from the type name) or an expression like
+#     "name=type" where name is the "name" of the parameter and "type" is the Java type.
+#  3. An optional group of arguments (enclosed in brackets: "[" and "]"), used to construct method
+#     overloads.
+#  4. A placeholder parameter -- like a normal argument but preceded by a minus "-". Placeholders
+#     are included as method parameters but are not not included on the wire when the request is
+#     sent to a server. Their purpose is to supply data for synthesized arguments (see next).
+#  5. A "synthesized" argument, in the form "+type:`expression`" where "type" is a Java type for
+#     the expression and "expression" is interpolated into the generated code and may refer to
+#     other parameters or fields (including placeholder parameters).
+#  6. A choice of arguments, in the form of argument lists that are separated by commas and enclosed
+#     in braces "{" and "}". Each choice is a permutation, used to generate a method (or set of
+#     methods). This can be used to more succinctly describe similar commands that may only vary
+#     by a symbol or sequence of argument types.
+#  7. A repeatable choice of arguments -- like a choice but prefixed with an asterisk, for example
+#     "*{ ... }". A repeatable choice of arguments results in a builder pattern being generated,
+#     where each choice is a method on the builder. All methods invoked on the builder result in
+#     tokens that are strung together to form the entire request sequence. The first "argument" for
+#     each choice in a repeatable choice must be a symbol (from which the builder method name is
+#     derived).
+#  8. An "exploded" argument. An exploded argument allows multiple arguments to Redis to be packed
+#     packaged in a single POJO argument to the generated method. When preparing the request, the
+#     argument is "exploded" into the constituents that appear in the "::{ ... }" block that
+#     appears after the argument. Each element in the block takes the same form as a synthesized
+#     argument. If a "[]" appears after the explosion, it means that the method accepts an array
+#     (or var-args or a collection) of the given type and each element is exploded. So something
+#     like "Pair<String,Double>::{ String:`e.getFirst()` double:`e.getSecond()` }[]" results in a
+#     Java method that accepts an array or collection of pairs. The resulting sequence of tokens
+#     in the Redis comment will expand each pair - first, second, first, second, and so on.
+#     NOTE: an exploded argument that is defined as an array of map entries will be replaced by an
+#     actual java.util.Map as the method argument and the actual collection of entries will come
+#     from its entrySet().
+#
+# If a command name is preceded by a question mark, that name is omitted from the Java method name.
+# For example, a command that starts like "?cluster :addSlots" results in a Java method named
+# simply "addSlots" but will result in "CLUSTER ADDSLOTS" being written on the wire for the request.
+# This can also be used with symbols, e.g. ":?with" will use "WITH" in the request format but will
+# omit "With" from the Java method name.
+#
+# Command names and symbols are allowed to have dashes (since Redis requires this in some of the
+# command tokens). Dashes are simply elided from the resulting Java method names.
+#
+# Commands can have an optional version annotation at the end, like "@3.0.3" (always denoted via
+# the at sign). Version information is generally extracted from the "commands.json" supplemental
+# file, but there are some cases where that file is not specific enough. For example, the "EXISTS"
+# command has been present since version 1.0.0, and that's is what appears in "commands.json". But
+# the original version only allowed a single key. Support for multiple keys did not appear until
+# version 3.0.3. So we annotated the var-arg overload with "@3.0.3".
+#
+# When arrays appear in parameter Java types, code generation will emit var-args where it can (e.g.
+# when the array is the last parameter in the list). Furthermore, the method will be overloaded to
+# accept both an array and a java.util.Collection.
+#
+# As is likely obvious from these comments, a pound sign "#" starts a comment that runs through the
+# end of the line and is ignored by the grammar.
+#
+#
+###############################################################################
+# (END OF DOC)
+###############################################################################
+
+# TODO: cleanup offsets - should all be int, not long
+
+// The main Redis interface. This provides methods for interacting with data
+// stored in redis. Accessors are also available for operations available in
+// various versions of redis as well as for other kinds of actions (like
+// administrative and configuration functions, cluster management,
+// introspection, etc.).
+//
+// <p>This is the entry point to the various <a href="http://redis.io/commands">commands</a>
+// supported by Redis. Numerous commands are not present directly as methods but instead accessible
+// via other interfaces, which logically group the commands that do not directly relate to using
+// Redis as a data-structure server/key-value store.
+Redis {
+    // Appends the given value to the value stored at the given key. If the
+    // key does not exist, this behaves similarly to {@link #set}.
+    append K V -> long;
+    bitCount K [start=long [end=long]] -> long;
+    bitField K *{:get type=bitfieldtype offset=long,
+                 :set type=BitFieldType offset=long value=long,
+                 :incrementBy=incrby type=BitFieldType offset=long inc=long,
+                 :overflow OverflowType} -> long[];
+    bit=bitop {:and, :or, :xor} dest=K src=K[] -> long;
+    bit=bitop :not dest=K src=K -> long;
+    bitPos K bit=boolean [start=long [end=long]] -> long;
+    blpop K[] timeoutSecs=long -> Entry<K,V>;
+    brpop K[] timeoutSecs=long -> Entry<K,V>;
+    brpopLpush source=K dest=K timeoutSecs=long -> V;
+    dbSize -> long;
+    decr K -> long;
+    decrBy K amount=long -> long;
+    del K -> boolean;
+    del K[] -> int @2.4;
+    dump K -> byte[];
+    echo String -> String;
+    eval script=String +int:`keys.length` K[] args=String[] -> Response;
+    evalSha sha=String +int:`keys.length` K[] args=String[] -> Response;
+    exists K -> boolean;
+    exists K[] -> int @3.0.3;
+    expire K expirySeconds=int -> boolean;
+    expireAt K -expiry=Instant +long:`instant.getEpochSecond()` -> boolean;
+    geoAdd K element=GeoElement<V>::{ double:`e.longitude()` double:`e.lattitude()` V:`e.get()` }[]
+        -> int;
+    geoHash K elements=V[] -> String[];
+    geoPos K elements=V[] -> GeoCoordinates[];
+    geoDist K element1=V element2=V [ unit=DistanceUnit ] -> Double;
+    geoRadius K longitude=double lattitude=double radius=double unit=DistanceUnit -> V[];
+    geoRadiusWith=georadius K longitude=double lattitude=double radius=double unit=DistanceUnit
+        *{:coords=withcoord, :distance=withdist, :geohash=withhash} -> GeoResult<V>[];
+    geoRadiusByMember K member=V radius=double unit=DistanceUnit -> V[];
+    geoRadiusByMemberWith=georadiusbymember K member=V radius=double unit=DistanceUnit
+        *{:coords=withcoord, :distance=withdist, :geohash=withhash} -> GeoResult<V>[];
+    get K -> V;
+    getBit K offset=long -> boolean;
+    getRange K start=long end=long -> V;
+    getSet K V -> V;
+    hdel K field=FK -> boolean;
+    hdel K fields=FK[] -> int @2.4;
+    hexists K field=FK -> boolean;
+    hget K field=FK -> V;
+    hgetAll K -> Map<FK, V>;
+    hincrBy K field=FK incr=long -> long;
+    hincrByFloat K field=FK incr=double -> double;
+    hkeys K -> FK[];
+    hlen K -> int;
+    hmget K FK[] -> V[];
+    hmset K Map<? extends FK, ? extends V>;
+    hscan K ScanCursor [:match pattern=String] [:count limit=int] -> ScanResult<Entry<FK, V>>;
+    hset K field=FK V -> boolean;
+    hsetNx K field=FK V -> boolean;
+    hstrLen K field=FK -> long;
+    hvals K -> V[];
+    incr K -> int;
+    incrBy K incr=long -> long;
+    incrByFloat K incr=double -> double;
+    lindex K index=int -> V;
+    linsert K {:before, :after} pivot=V V -> int;
+    llen K -> int;
+    lpop K -> V;
+    lpush K V -> int;
+    lpush K V[] -> int @2.4;
+    lpushX K V -> int;
+    lrange K start=int stop=int -> V[];
+    lrem K count=int V -> int;
+    lset K index=int V;
+    ltrim K start=int stop=int;
+    mget K[] -> V[];
+    mset Map<? extends K, ? extends V>;
+    msetnx Map<? extends K, ? extends V> -> boolean;
+    persist K -> boolean;
+    pexpire K expiryMilliseconds=int -> boolean;
+    pexpireAt K -expiry=Instant +long:`instant.toEpochMillis()` -> boolean;
+    pfadd K V[] -> boolean;
+    pfcount K[] -> int;
+    pfmerge dest=K src=K[];
+    ping -> String;
+    ping message=String -> String;
+    psetEx K expiryMillis=int V;
+    pttl K -> int;
+    publish channel=String message=V -> int;
+    randomKey -> K;
+    rename oldKey=K newKey=K;
+    renameNx oldKey=K newKey=K -> boolean;
+    restore K expiryMillis=int value=byte[];
+    restore K expiryMillis=int value=byte[] :replace @3.0;
+    role -> RedisRole;
+    rpop K -> V;
+    rpopLpush source=K dest=K -> V;
+    rpush K V -> int;
+    rpush K V[] -> int @2.4;
+    rpushX K V -> int;
+    sadd K V -> boolean;
+    sadd K V[] -> int @2.4;
+    scan ScanCursor [:match pattern=String] [:count limit=int] -> ScanResult<K>;
+    scard K -> int;
+    script :exists shas=String[] -> boolean[];
+    sdiff K[] -> V[];
+    sdiffStore dest=K K[] -> int;
+    set K V;
+    set K V :ex expirySeconds=int :nx -> boolean:OkOrNilListener @2.6.12;
+    set K V :px expiryMillis=int :nx -> boolean:OkOrNilListener @2.6.12;
+    set K V :ex expirySeconds=int :xx -> boolean:OkOrNilListener @2.6.12;
+    set K V :px expiryMillis=int :xx -> boolean:OkOrNilListener @2.6.12;
+    setBit K offset=long V -> boolean;
+    setEx K expirySeconds=int V;
+    setNx K V -> boolean;
+    setRange K offset=int V;
+    sinter K[] -> V[];
+    sinterStore dest=K K[] -> int;
+    sisMember K V -> boolean;
+    smembers K -> V[];
+    smove source=K dest=K V -> boolean;
+    sort K *{ :by pattern=String, :limit offset=int count=int, :get pattern=String, :asc, :desc,
+              :alpha, :store K } -> V[];
+    spop K -> V;
+    srandMember K -> V;
+    srem K V -> boolean;
+    srem K V[] -> int @2.4;
+    sscan K ScanCursor [:match pattern=String] [:count limit=int] -> ScanResult<V>;
+    strLen K -> int;
+    substr K start=long end=long -> V @1.0 ==> getRange @2.4;
+    sunion K[] -> V[];
+    sunionStore dest=K K[] -> int;
+    time -> Instant:InstantWithMicrosListener;
+    ttl K -> int;
+    type K -> EntryType;
+    zadd K score=double member=V -> boolean;
+    zadd K Map<? extends V, ? extends Double> -> int @2.4;
+    zadd K {:nx, :xx} score=double member=V -> boolean @3.0.2;
+    zadd K {:nx, :xx} Map<? extends V, ? extends Double> -> int @3.0.2;
+    zadd K :incr score=double member=V -> double @3.0.2;
+    zadd K [ {:nx, :xx} ] :ch score=double member=V -> boolean @3.0.2;
+    zadd K [ {:nx, :xx} ] :ch Map<? extends V, ? extends Double> -> int @3.0.2;
+    zcard K -> int;
+    zcount K min=double max=double -> int;
+    zincrBy K incr=double member=V -> double;
+    zinterStore dest=K +int:`keys.length` K[] [+String:`"AGGREGATE"` AggregateType] -> int;
+    zinterStore dest=K -keysAndWeights=Map<? extends K, ? extends Double>
+        +int:`keysAndWeights.size()` +Collection<? extends K>:`keysAndWeights.keySet()`
+        :weights +Collection<? extends Double>:`keysAndWeights.value()`
+        [+String:`"AGGREGATE"` AggregateType] -> int;
+    zlexCount K min=Bound<V> max=Bound<V> -> int;
+    zrange K start=int stop=int -> V[];
+    zrange K start=int stop=int :withScores -> Map<V, Double> @2.0;
+    zrangeByLex K min=Bound<V> max=Bound<V> [:limit offset=int count=int] -> V[];
+    zrangeByScore K min=Bound.OfDouble max=Bound.OfDouble [:limit offset=int count=int] -> V[];
+    zrangeByScore K min=Bound.OfDouble max=Bound.OfDouble :withScores [:limit offset=int count=int]
+        -> Map<V, Double> @2.0;
+    zrank K V -> Integer;
+    zrem K V -> boolean;
+    zrem K V[] -> int @2.4;
+    zremRangeByLex K min=Bound<V> max=Bound<V> -> int;
+    zremRangeByRank K start=int stop=int -> int;
+    zremRangeByScore K min=Bound.OfDouble max=Bound.OfDouble -> int;
+    zrevRange K start=int stop=int -> V[];
+    zrevRange K start=int stop=int :withScore -> Map<V, Double>;
+    zrevRangeByLex K max=Bound<V> min=Bound<V> [:limit offset=int count=int] -> V[];
+    zrevRangeByScore K max=Bound.OfDouble min=Bound.OfDouble [:limit offset=int count=int] -> V[];
+    zrevRangeByScore K max=Bound.OfDouble min=Bound.OfDouble :withScores
+        [:limit offset=int count=int] -> Map<V, Double>;
+    zrevRank K V -> Integer;
+    zscan K ScanCursor [:match pattern=String] [:count limit=int] -> ScanResult<Entry<V, Double>>;
+    zscore K V -> double;
+    zunionStore dest=K +int:`keys.length` K[] [+String:`"AGGREGATE"` AggregateType] -> int;
+    zunionStore dest=K -keysAndWeights=Map<? extends K, ? extends Double>
+        +int:`keysAndWeights.size()` +Collection<? extends K>:`keysAndWeights.keySet()`
+        :weights +Collection<? extends Double>:`keysAndWeights.value()`
+        [+String:`"AGGREGATE"` AggregateType] -> int;
+
+# Transactions are handled in a special way since they require exclusive use of a channel and
+# due to the way "multi" changes the way Redis responds until a subsequent "exec" or "discard".
+#   discard
+#   exec -> Response[]
+#   multi
+#   watch K[]
+#   unwatch
+
+# Subscriptions are handled in a special way since they require exclusive use of a channel due to
+# the way they change the incoming stream from Redis.
+#   subscribe channels=String[]
+#   psubscribe patterns=String[]
+#   unsubscribe channels=String[]
+#   punsubscribe patterns=String[]
+}
+
+// Interface for accessing and changing client properties. These are currently limited to how
+// the client identifies and authenticates itself.
+ClientProperties {
+    auth password=String;
+    client :getName -> String;
+    client :setName name=String;
+    
+# Changing the reply mode is handled in a special way since it requires exclusive use of a channel
+# because of how it changes the way Redis responds.
+#   client :reply {:on, :off, :skip}
+}
+
+// The interface of operations likely to be used in administering Redis and not in otherwise normal
+// usage. This contains several "dangerous" operations, like {@code FLUSHALL}, {@code FLUSHDB}, and
+// {@code KEYS}. Some exceptions include the {@code SELECT} command which is present here, instead
+// of the main interface, because of the fact it can be dangerous in connection pools for one caller
+// to change the database that the connection uses. (It is instead expected to be used as a one-time
+// connection setup task.)
+AdminOperations {
+    bgRewriteAof;
+    bgSave;
+    client :kill address=HostAndPort;
+    client :kill *{:address=addr address=HostAndPort,
+                   :clientId=id clientId=String,
+                   :clientType=type clienttype, :skipMe yesno} -> long;
+    client :list -> ClientInfo[];
+    client :pause timeoutMillis=long;
+    ?config :resetStats=resetstat;
+    ?debug :segFault;
+    flushAll;
+    flushDb;
+    info -> RedisInfo;
+    info :all -> RedisInfo;
+    info section=String -> RedisInfo.Section;
+    keys pattern=String -> stream K;
+    lastSave -> Instant;
+    migrate -HostAndPort +String:`hostAndPort.getHost()` +int:`hostAndPort.getPort()` K destDb=int
+        networkTimeoutMillis=int -> boolean:OkOrNoKeyListener;
+    migrate -HostAndPort +String:`hostAndPort.getHost()` +int:`hostAndPort.getPort()` K destDb=int
+        networkTimeoutMillis=int :copy -> boolean:OkOrNoKeyListener @3.0;
+    migrate -HostAndPort +String:`hostAndPort.getHost()` +int:`hostAndPort.getPort()` K destDb=int
+        networkTimeoutMillis=int :replace -> boolean:OkOrNoKeyListener @3.0;
+    migrate -HostAndPort +String:`hostAndPort.getHost()` +int:`hostAndPort.getPort()` +String:`""`
+        destDb=int networkTimeoutMillis=int :keys K[] -> boolean:OkOrNoKeyListener @3.0.6;
+    move K dbNumber=int -> boolean;
+    pubsub :channels pattern=String -> String[];
+    pubsub: numSub channels=String[] -> int[];
+    pubsub :numPat -> int;
+    save;
+    script :flush;
+    script :kill;
+    script :load script=String -> String;
+    select index=int;
+    slaveOf -HostAndPort +String:`hostAndPort.getHost()` +int:`hostAndPort.getPort()`;
+    slaveOf :no :one;
+    slowLog :get [count=int] -> SlowLogEntry[];
+    slowLog :len -> int;
+    slowLog :reset;
+    wait numSlaves=int timeoutMillis=int -> int;
+
+# Monitor mode is handled in a special way since it requires exclusive use of a channel due to how
+# it changes the way Redis responds.
+#   monitor
+
+# The generated interface cannot perform Lua script debugging. So there's no need to surface this.
+#   script :debug DebugMode;
+
+# Actions that close the connection are not currently supported. They would need to use
+# "client reply skip" so that the generated code does not expect a reply. Also, they are inherently
+# dangerous.
+#   quit;
+#   shutdown;
+#   shutdown {:save, :nosave} @2.6;
+}
+
+// Commands for introspecting the current Redis server and the commands it supports. The operations
+// herein can be used to reflect on the commands supported by the server and to inspect the data and
+// metadata associated with each key.
+Introspection {
+    commands=command -> CommandInfo[];
+    command :count -> int;
+    command :getKeys command=String[] -> K[];
+    command :info commands=String[] -> CommandInfo[];
+    debug :object K -> String;
+    object :refCount K -> int;
+    object :encoding K -> EncodingType;
+    object :idleSeconds=idletime K -> int;
+}
+
+// An interface for viewing and modifying the Redis server's configuration.
+Configuration {
+    ?config :get pattern=String -> Map<String,String>;
+    ?config :rewrite;
+    ?config :set parameter=String value=String;
+}
+
+// Cluster management operations, only useful with Redis Cluster and generally unused when working
+// with a singular Redis instance. See the <a href="http://redis.io/topics/cluster-tutorial">Redis
+// Cluster Tutorial</a> for more information. 
+ClusterManagement {
+    ?cluster :addSlots slots=long[];
+    ?cluster :count-Failure-Reports nodeId=String -> long;
+    ?cluster :countKeysInSlot slot=long -> long;
+    ?cluster :deleteSlots=delslots slots=long[];
+    ?cluster :failOver type=ClusterFailoverType;
+    ?cluster :forget nodeId=String;
+    ?cluster :getKeysInSlot slot=long count=long -> K[];
+    ?cluster :info -> ClusterInfo;
+    ?cluster :keySlot K -> long;
+    ?cluster :meet ip=String port=int;
+    ?cluster :nodes -> ClusterNodeInfo[];
+    ?cluster :replicate nodeId=String;
+    ?cluster :reset [type=ClusterResetType];
+    ?cluster :saveConfig;
+    ?cluster :set-Config-Epoch epoch=long;
+    ?cluster :setSlot slot=long state=ClusterSlotState;
+    ?cluster :setSlot slot=long :node nodeId=String;
+    ?cluster :slaves nodeId=String -> ClusterNodeInfo[];
+    ?cluster :slots -> RangeMap<Long,ClusterNode>;
+    readOnly;
+    readWrite;
+}

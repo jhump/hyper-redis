@@ -1,0 +1,683 @@
+{
+  "append": [
+    "write",
+    "denyoom"
+  ],
+  "asking": [
+    "fast"
+  ],
+  "auth": [
+    "noscript",
+    "loading",
+    "stale",
+    "fast"
+  ],
+  "bgrewriteaof": [
+    "admin"
+  ],
+  "bgsave": [
+    "admin"
+  ],
+  "bitcount": [
+    "readonly"
+  ],
+  "bitfield": [
+    "write",
+    "denyoom"
+  ],
+  "bitop": [
+    "write",
+    "denyoom"
+  ],
+  "bitpos": [
+    "readonly"
+  ],
+  "blpop": [
+    "write",
+    "noscript"
+  ],
+  "brpop": [
+    "write",
+    "noscript"
+  ],
+  "brpoplpush": [
+    "write",
+    "denyoom",
+    "noscript"
+  ],
+  "client": [
+    "admin",
+    "noscript"
+  ],
+  "cluster": [
+    "admin"
+  ],
+  "command": [
+    "loading",
+    "stale"
+  ],
+  "config": [
+    "admin",
+    "loading",
+    "stale"
+  ],
+  "dbsize": [
+    "readonly",
+    "fast"
+  ],
+  "debug": [
+    "admin",
+    "noscript"
+  ],
+  "decr": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "decrby": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "del": [
+    "write"
+  ],
+  "discard": [
+    "noscript",
+    "fast"
+  ],
+  "dump": [
+    "readonly"
+  ],
+  "echo": [
+    "fast"
+  ],
+  "eval": [
+    "noscript",
+    "movablekeys"
+  ],
+  "evalsha": [
+    "noscript",
+    "movablekeys"
+  ],
+  "exec": [
+    "noscript"
+  ],
+  "exists": [
+    "readonly",
+    "fast"
+  ],
+  "expire": [
+    "write",
+    "fast"
+  ],
+  "expireat": [
+    "write",
+    "fast"
+  ],
+  "flushall": [
+    "write"
+  ],
+  "flushdb": [
+    "write"
+  ],
+  "geoadd": [
+    "write",
+    "denyoom"
+  ],
+  "geodist": [
+    "readonly"
+  ],
+  "geohash": [
+    "readonly"
+  ],
+  "geopos": [
+    "readonly"
+  ],
+  "georadius": [
+    "write"
+  ],
+  "georadiusbymember": [
+    "write"
+  ],
+  "get": [
+    "readonly",
+    "fast"
+  ],
+  "getbit": [
+    "readonly",
+    "fast"
+  ],
+  "getrange": [
+    "readonly"
+  ],
+  "getset": [
+    "write",
+    "denyoom"
+  ],
+  "hdel": [
+    "write",
+    "fast"
+  ],
+  "hexists": [
+    "readonly",
+    "fast"
+  ],
+  "hget": [
+    "readonly",
+    "fast"
+  ],
+  "hgetall": [
+    "readonly"
+  ],
+  "hincrby": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "hincrbyfloat": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "hkeys": [
+    "readonly"
+  ],
+  "hlen": [
+    "readonly",
+    "fast"
+  ],
+  "hmget": [
+    "readonly"
+  ],
+  "hmset": [
+    "write",
+    "denyoom"
+  ],
+  "hscan": [
+    "readonly",
+    "random"
+  ],
+  "hset": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "hsetnx": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "hstrlen": [
+    "readonly",
+    "fast"
+  ],
+  "hvals": [
+    "readonly"
+  ],
+  "incr": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "incrby": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "incrbyfloat": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "info": [
+    "loading",
+    "stale"
+  ],
+  "keys": [
+    "readonly"
+  ],
+  "lastsave": [
+    "random",
+    "fast"
+  ],
+  "latency": [
+    "admin",
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "lindex": [
+    "readonly"
+  ],
+  "linsert": [
+    "write",
+    "denyoom"
+  ],
+  "llen": [
+    "readonly",
+    "fast"
+  ],
+  "lpop": [
+    "write",
+    "fast"
+  ],
+  "lpush": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "lpushx": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "lrange": [
+    "readonly"
+  ],
+  "lrem": [
+    "write"
+  ],
+  "lset": [
+    "write",
+    "denyoom"
+  ],
+  "ltrim": [
+    "write"
+  ],
+  "mget": [
+    "readonly"
+  ],
+  "migrate": [
+    "write",
+    "movablekeys"
+  ],
+  "monitor": [
+    "admin",
+    "noscript"
+  ],
+  "move": [
+    "write",
+    "fast"
+  ],
+  "mset": [
+    "write",
+    "denyoom"
+  ],
+  "msetnx": [
+    "write",
+    "denyoom"
+  ],
+  "multi": [
+    "noscript",
+    "fast"
+  ],
+  "object": [
+    "readonly"
+  ],
+  "persist": [
+    "write",
+    "fast"
+  ],
+  "pexpire": [
+    "write",
+    "fast"
+  ],
+  "pexpireat": [
+    "write",
+    "fast"
+  ],
+  "pfadd": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "pfcount": [
+    "readonly"
+  ],
+  "pfdebug": [
+    "write"
+  ],
+  "pfmerge": [
+    "write",
+    "denyoom"
+  ],
+  "pfselftest": [
+    "admin"
+  ],
+  "ping": [
+    "stale",
+    "fast"
+  ],
+  "psetex": [
+    "write",
+    "denyoom"
+  ],
+  "psubscribe": [
+    "pubsub",
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "psync": [
+    "readonly",
+    "admin",
+    "noscript"
+  ],
+  "pttl": [
+    "readonly",
+    "fast"
+  ],
+  "publish": [
+    "pubsub",
+    "loading",
+    "stale",
+    "fast"
+  ],
+  "pubsub": [
+    "pubsub",
+    "random",
+    "loading",
+    "stale"
+  ],
+  "punsubscribe": [
+    "pubsub",
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "randomkey": [
+    "readonly",
+    "random"
+  ],
+  "readonly": [
+    "fast"
+  ],
+  "readwrite": [
+    "fast"
+  ],
+  "rename": [
+    "write"
+  ],
+  "renamenx": [
+    "write",
+    "fast"
+  ],
+  "replconf": [
+    "admin",
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "restore": [
+    "write",
+    "denyoom"
+  ],
+  "restore-asking": [
+    "write",
+    "denyoom",
+    "asking"
+  ],
+  "role": [
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "rpop": [
+    "write",
+    "fast"
+  ],
+  "rpoplpush": [
+    "write",
+    "denyoom"
+  ],
+  "rpush": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "rpushx": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "sadd": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "save": [
+    "admin",
+    "noscript"
+  ],
+  "scan": [
+    "readonly",
+    "random"
+  ],
+  "scard": [
+    "readonly",
+    "fast"
+  ],
+  "script": [
+    "noscript"
+  ],
+  "sdiff": [
+    "readonly"
+  ],
+  "sdiffstore": [
+    "write",
+    "denyoom"
+  ],
+  "select": [
+    "loading",
+    "fast"
+  ],
+  "set": [
+    "write",
+    "denyoom"
+  ],
+  "setbit": [
+    "write",
+    "denyoom"
+  ],
+  "setex": [
+    "write",
+    "denyoom"
+  ],
+  "setnx": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "setrange": [
+    "write",
+    "denyoom"
+  ],
+  "shutdown": [
+    "admin",
+    "loading",
+    "stale"
+  ],
+  "sinter": [
+    "readonly"
+  ],
+  "sinterstore": [
+    "write",
+    "denyoom"
+  ],
+  "sismember": [
+    "readonly",
+    "fast"
+  ],
+  "slaveof": [
+    "admin",
+    "noscript",
+    "stale"
+  ],
+  "slowlog": [
+    "admin"
+  ],
+  "smembers": [
+    "readonly"
+  ],
+  "smove": [
+    "write",
+    "fast"
+  ],
+  "sort": [
+    "write",
+    "denyoom",
+    "movablekeys"
+  ],
+  "spop": [
+    "write",
+    "noscript",
+    "random",
+    "fast"
+  ],
+  "srandmember": [
+    "readonly",
+    "random"
+  ],
+  "srem": [
+    "write",
+    "fast"
+  ],
+  "sscan": [
+    "readonly",
+    "random"
+  ],
+  "strlen": [
+    "readonly",
+    "fast"
+  ],
+  "subscribe": [
+    "pubsub",
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "substr": [
+    "readonly"
+  ],
+  "sunion": [
+    "readonly"
+  ],
+  "sunionstore": [
+    "write",
+    "denyoom"
+  ],
+  "sync": [
+    "readonly",
+    "admin",
+    "noscript"
+  ],
+  "time": [
+    "random",
+    "fast"
+  ],
+  "ttl": [
+    "readonly",
+    "fast"
+  ],
+  "type": [
+    "readonly",
+    "fast"
+  ],
+  "unsubscribe": [
+    "pubsub",
+    "noscript",
+    "loading",
+    "stale"
+  ],
+  "unwatch": [
+    "noscript",
+    "fast"
+  ],
+  "wait": [
+    "noscript"
+  ],
+  "watch": [
+    "noscript",
+    "fast"
+  ],
+  "zadd": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "zcard": [
+    "readonly",
+    "fast"
+  ],
+  "zcount": [
+    "readonly",
+    "fast"
+  ],
+  "zincrby": [
+    "write",
+    "denyoom",
+    "fast"
+  ],
+  "zinterstore": [
+    "write",
+    "denyoom",
+    "movablekeys"
+  ],
+  "zlexcount": [
+    "readonly",
+    "fast"
+  ],
+  "zrange": [
+    "readonly"
+  ],
+  "zrangebylex": [
+    "readonly"
+  ],
+  "zrangebyscore": [
+    "readonly"
+  ],
+  "zrank": [
+    "readonly",
+    "fast"
+  ],
+  "zrem": [
+    "write",
+    "fast"
+  ],
+  "zremrangebylex": [
+    "write"
+  ],
+  "zremrangebyrank": [
+    "write"
+  ],
+  "zremrangebyscore": [
+    "write"
+  ],
+  "zrevrange": [
+    "readonly"
+  ],
+  "zrevrangebylex": [
+    "readonly"
+  ],
+  "zrevrangebyscore": [
+    "readonly"
+  ],
+  "zrevrank": [
+    "readonly",
+    "fast"
+  ],
+  "zscan": [
+    "readonly",
+    "random"
+  ],
+  "zscore": [
+    "readonly",
+    "fast"
+  ],
+  "zunionstore": [
+    "write",
+    "denyoom",
+    "movablekeys"
+  ]
+}
